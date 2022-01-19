@@ -146,14 +146,59 @@ public SMCResult KeyValueParse(SMCParser smc, const char[] key, const char[] val
     if(ignoreThisSection || kvPlayers == null) {
         return SMCParse_Continue;
     }
+    
     if(kvPlayers.GetDataType(key) == KvData_None) {
         //User wasn't found in kvPlayers, let's skip the rest and just add them now.
         kvPlayers.SetString(key, value);
+        if(StrContains(key, "STEAM")) {
+            GroupId groupId = FindAdmGroup(key);
+            if(groupId != INVALID_GROUP_ID)
+                GroupHandler_GroupCreated2(key, groupId);
+        }
         return SMCParse_Continue;
     }
     char groupBuffer[512];
     kvPlayers.GetString(key, groupBuffer, sizeof(groupBuffer), "");
     Format(groupBuffer, sizeof(groupBuffer), "%s,%s", groupBuffer, value);
     kvPlayers.SetString(key, groupBuffer);
+    if(StrContains(key, "STEAM")) {
+        GroupId groupId = FindAdmGroup(key);
+        if(groupId != INVALID_GROUP_ID)
+            GroupHandler_GroupCreated2(key, groupId);
+    }
     return SMCParse_Continue;
+}
+
+void GroupHandler_GroupCreated2(const char[] name, GroupId id) {
+    if(kvPlayers.GetDataType(name) != KvData_String) {
+        return;
+    }
+    
+    char buffer[512];
+    kvPlayers.GetString(name, buffer, sizeof(buffer));
+    // Split the string into multiple groups.
+    TrimString(buffer);
+    if(buffer[0] == '\0') {
+        return;
+    }
+    
+    char overridePart[32];
+    int strLength = strlen(buffer);
+    for(int bufferPos = 0; bufferPos < strLength; )
+    {
+        int tempPos = StrContains(buffer[bufferPos], ",", false);
+        if(tempPos == -1) {
+            tempPos = strLength;
+        }
+        strcopy(overridePart, tempPos+1, buffer[bufferPos]);
+        bufferPos += tempPos+1;
+        TrimString(overridePart);
+        if(strlen(overridePart) > 0) {
+            AddAdmGroupCmdOverride(id, overridePart, Override_Command, Command_Allow);
+        }
+    }
+}
+
+public void GroupHandler_GroupCreated(char[] name, GroupId id) {
+    GroupHandler_GroupCreated2(name, id);
 }
